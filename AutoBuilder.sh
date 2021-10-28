@@ -18,7 +18,7 @@ loadTargets () {
         if ! [ -z "$line" ]; then
             targets+=("$line")
         fi
-    done < "Targets.txt"
+    done < "./config/Targets.txt"
     echo "Targets to build : ${targets[@]}"
 }
 
@@ -28,7 +28,7 @@ loadVersions () {
         if ! [ -z "$line" ]; then
             versions+=("$line")
         fi
-    done < "Versions.txt"
+    done < "./config/Versions.txt"
     echo "Versions to build : $versions"
 }
 
