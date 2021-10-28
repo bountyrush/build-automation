@@ -1,0 +1,27 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+# fastlane produce -u ayyappa.99@gmail.com -a com.bountyrushgames.circleleap
+#import("./Setup")
+ROOT_FOLDER_PATH = File.expand_path('../../', Dir.pwd).freeze
+CONFIG_FOLDER_PATH = File.join(ROOT_FOLDER_PATH, 'config').freeze
+ENV["ROOT_FOLDER_PATH"] = ROOT_FOLDER_PATH
+
+targetPlatform = ARGV[0]
+$PlatformProjectBuildPath = File.join(ROOT_FOLDER_PATH, "builds/#{targetPlatform}/");
+$OutputDirectory = File.join(ROOT_FOLDER_PATH, "apps/#{targetPlatform}/v" + ENV["PRODUCT_VERSION"]);
+
+before_all do
+  #update_fastlane
+end
+
+import("./platforms/ios/Fastfile")
+import("./platforms/android/Fastfile")

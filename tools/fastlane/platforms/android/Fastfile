@@ -1,0 +1,119 @@
+#Android
+begin
+    puts "ROOT_FOLDER_PATH : #{ROOT_FOLDER_PATH}"
+    $JsonKeyFilePath = CredentialsManager::AppfileConfig.try_fetch_value(:json_key_file)
+    $BundleIdentifier = ''
+    $ProjectGradleFilePath = ''
+  
+    platform :android do
+      before_all do
+        $BundleIdentifier = ENV["ANDROID_BUNDLE_IDENTIFIER"] || ENV["BUNDLE_IDENTIFIER"]
+        $PlatformProjectBuildPath = File.join($PlatformProjectBuildPath, ENV["PRODUCT_NAME"])
+        $ProjectGradleFilePath = File.join($PlatformProjectBuildPath.gsub("\ ", " "), ENV["ANDROID_GRADLE_SUB_FOLDER"], "build.gradle")
+
+        # Set version number first
+        increment_version_code(
+            version_code: get_next_version_code(),
+            gradle_file_path: $ProjectGradleFilePath
+        )
+      end
+  
+      desc "Build gradle project"
+      lane :build do |values|
+        task = values[:task]
+        build_type = values[:build_type]
+        puts "Task #{task}"
+
+        gradle(
+            task: task,
+            build_type: build_type,
+            project_dir: $PlatformProjectBuildPath,
+            print_command: true,
+            properties: getAndroidBuildProperties(build_type),
+            print_command_output: true
+          )
+        copyBuiltApp(lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH], build_type)
+      end
+  
+      desc "Upload ipa file to AppStoreConnect and check if AppStore site is configures correctly"
+      lane :upload do |values|
+        track = values[:track]
+        release_status = values[:release_status] || 'completed'
+      
+        upload_to_play_store(track: 'beta', release_status: release_status, skip_upload_apk: true, 'metadata_path': "#{CONFIG_FOLDER_PATH}/metadata/android")
+        say "A new build is deployed to google play console"        
+      end
+  
+      desc "Build for dev"
+      lane :dev do
+        build(task: 'assemble', build_type: 'Debug')
+      end
+  
+      desc "Build for release"
+      lane :release do
+        build(task: 'bundle', build_type: 'Release')
+        #upload(track: 'beta')
+      end
+
+      desc "Upload a draft (useful for very first time setup)"
+      lane :draft do
+        build(task: 'bundle', build_type: 'Release')
+        upload(track: 'beta', release_status: 'draft')
+      end
+  
+      after_all do |lane|
+        say "Finished lane #{lane} for #{ENV["PRODUCT_NAME"]}."
+      end
+  
+      error do |lane, exception| 
+        say "Error when running fastlane"
+      end
+    end
+
+    def getAndroidBuildProperties(buildType)
+        properties = {}
+      
+        if buildType == 'Debug'
+            properties['android.injected.signing.store.file'] = File.expand_path(ENV["ANDROID_DEBUG_SIGNING_STORE_FILE_PATH"])
+            properties['android.injected.signing.store.password'] = ENV["ANDROID_DEBUG_SIGNING_STORE_FILE_PASSWORD"]
+            properties['android.injected.signing.key.alias'] = ENV["ANDROID_DEBUG_SIGNING_KEY_ALIAS"]
+            properties['android.injected.signing.key.password'] = ENV["ANDROID_DEBUG_SIGNING_KEY_PASSWORD"]
+        else
+            properties['android.injected.signing.store.file'] = File.join(ROOT_FOLDER_PATH, ENV["ANDROID_RELEASE_SIGNING_STORE_FILE_PATH"])
+            properties['android.injected.signing.store.password'] = ENV["ANDROID_RELEASE_SIGNING_STORE_FILE_PASSWORD"]
+            properties['android.injected.signing.key.alias'] = ENV["ANDROID_RELEASE_SIGNING_KEY_ALIAS"]
+            properties['android.injected.signing.key.password'] = ENV["ANDROID_RELEASE_SIGNING_KEY_PASSWORD"]
+        end
+
+        puts "Properties :  #{properties}" 
+        return properties
+    end
+
+    def copyBuiltApp(source, buildType)
+        copyFile(source, ROOT_FOLDER_PATH + '/apps/android/' + '/v' + ENV["PRODUCT_VERSION"])
+    end
+
+    def copyFile(source, destination)
+        unless source.nil? || source.empty?
+          sh("mkdir -p '#{destination}'", log: false)
+          sh("cp '#{source}' '#{destination}'", log: false)
+        end
+    end
+
+    def get_next_version_code()
+        puts "fetching play_store_version_code_to_upload_to"
+        versionCode = ['internal', 'alpha', 'beta', 'production'].map { |branch|
+            begin
+                versionCode = google_play_track_version_codes(track: branch, 
+                              package_name: $BundleIdentifier,
+                              json_key: $JsonKeyFilePath).max
+                versionCode ||= 0
+            rescue
+                0
+            end
+        }
+        puts "versionCode : #{versionCode}"
+        return versionCode.max + 1
+    end
+  end
+  

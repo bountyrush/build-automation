@@ -1,0 +1,78 @@
+begin
+  puts "ROOT_FOLDER_PATH : #{ROOT_FOLDER_PATH}"
+  $BundleIdentifier = ''
+  $XcodeProjectPath = ''
+  $OutputName = ''
+
+  platform :ios do
+    before_all do
+      $BundleIdentifier = ENV["IOS_BUNDLE_IDENTIFIER"] || ENV["BUNDLE_IDENTIFIER"]
+      $XcodeProjectPath = File.join($PlatformProjectBuildPath, ENV["IOS_TARGET_SCHEME"] + ".xcodeproj").freeze
+      $OutputName       = ENV["PRODUCT_NAME"] + ".ipa";
+      
+      # Set version number first
+      increment_version_number(
+        xcodeproj: $XcodeProjectPath,
+        version_number: ENV["PRODUCT_VERSION"] # Set a specific version number
+      )
+      # Increment build number
+      increment_build_number(xcodeproj: $XcodeProjectPath)
+    end
+
+    desc "Build xcode project"
+    lane :build do |values|
+      configuration = values[:configuration]
+      export_method = values[:export_method]
+      gym(
+        project: $XcodeProjectPath,
+        output_directory: $OutputDirectory,
+        output_name: $OutputName,
+        configuration: configuration,
+        export_method: export_method
+      )
+    end
+
+    desc "Upload ipa file to AppStoreConnect and check if AppStore site is configures correctly"
+    lane :upload do
+    
+      pilot(
+        ipa: $OutputDirectory + "/" + $OutputName, 
+        skip_submission:true
+      )
+      
+      say "A new build is ready to deploy on testflight!"
+      
+      #https://docs.fastlane.tools/actions/deliver/ for updating meta data automatically
+      
+    end
+
+    desc "For matching certificates"
+    lane :match_profile do |values|
+      type  = values[:type]
+      puts "Matching profiles for for #{type}"
+      match(type: type, app_identifier: ENV["BUNDLE_IDENTIFIER"], git_url: ENV["IOS_CERTIFICATES_GIT_URL"])
+    end
+
+    desc "Build for dev"
+    lane :dev do
+      match_profile(type: 'development')
+      build(configuration: 'Debug', export_method: 'development')
+    end
+
+    desc "Build for release"
+    lane :release do
+      match_profile(type: 'appstore')
+      increment_build_number(xcodeproj: $XcodeProjectPath)
+      build(configuration: 'Release', export_method: 'app-store')
+      upload
+    end
+
+    after_all do |lane|
+      say "Finished lane #{lane} for #{ENV["PRODUCT_NAME"]}."
+    end
+
+    error do |lane, exception| 
+      say "Error when running fastlane"
+    end
+  end
+end

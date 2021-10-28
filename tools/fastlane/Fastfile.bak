@@ -1,0 +1,232 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+# Require Env
+require 'dotenv'
+require 'fileutils'
+
+# Path Constants
+ROOT_FOLDER_PATH = CredentialsManager::AppfileConfig::ROOT_FOLDER #Caps in ruby are constants
+CONFIG_FOLDER_PATH = CredentialsManager::AppfileConfig::CONFIG_FOLDER
+JSON_KEY_FILE_PATH = CredentialsManager::AppfileConfig.try_fetch_value(:json_key_file)
+
+puts "ROOT_FOLDER_PATH : #{ROOT_FOLDER_PATH}"
+
+# Projects
+ANDROID_PROJECT_PATH = File.join(ROOT_FOLDER_PATH, 'builds/android/' + ENV["PRODUCT_NAME"]).freeze
+IOS_PROJECT_PATH = File.join(ROOT_FOLDER_PATH, 'builds/ios/').freeze
+ENV_FOLDER_PATH = File.join(CONFIG_FOLDER_PATH, 'env').freeze
+GRADLE_FILE_PATH = File.join(ANDROID_PROJECT_PATH.gsub("\ ", " "), ENV["ANDROID_GRADLE_SUB_FOLDER"], 'build.gradle').freeze
+
+puts "Gradle file path : #{GRADLE_FILE_PATH}"
+
+# Load Primary .env
+Dotenv.load("%s/.env" % ENV_FOLDER_PATH)
+
+# Loads Env Variables by build type 
+def getEnv(buildType)
+  env = '%s/.env.%s' % [ENV_FOLDER_PATH, buildType]
+  UI.header("Environment")
+  Dotenv.load(env)
+  UI.success("Loaded #{env}")
+end
+
+
+before_all do
+  #update_fastlane
+end
+
+
+default_platform(:ios)
+
+
+platform :ios do
+  before_all do
+    #ENV["UNITY_PRODUCT_NAME"] = ""
+  end
+
+  desc "Build ipa file from Xcode project, which is ready for deployment on the AppStore"
+  lane :dev do
+    #match(
+      #type: "appstore"
+    #)
+
+    update_code_signing_settings(
+      use_automatic_signing: true,
+      path: IOS_PROJECT_PATH + "/Unity-iPhone.xcodeproj",
+      team_id: ENV["IOS_TEAM_ID"]
+    )
+
+    gym(
+      #workspace: "Builds/ios/" + ENV["UNITY_PRODUCT_NAME"] + "/Unity-iPhone.xcworkspace",
+      project: IOS_PROJECT_PATH + "/Unity-iPhone.xcodeproj",
+      output_directory: ROOT_FOLDER_PATH + '/apps/ios/' + ENV["FASTLANE_LANE_NAME"] + '/v' + ENV["PRODUCT_VERSION"],
+      output_name: ENV["PRODUCT_NAME"]+".ipa",
+      xcargs: "-allowProvisioningUpdates"
+    )
+    
+  end
+
+  desc "Upload ipa file to AppStoreConnect and check if AppStore site is configures correctly"
+  lane :upload do
+    pilot(
+      ipa: "Builds/ios/" + ENV["UNITY_PRODUCT_NAME"] + ".ipa", 
+      skip_submission:true
+    )
+    # precheck(
+    #   copyright_date: [level: :skip]
+    # )
+    say "Yey, it worked. A new build is ready to deploy on testflight!"
+  end
+
+  desc "Complete build process to get a new build for AppStoreConnect"
+  lane :beta do
+    build_unity
+    build_ipa
+    upload	
+  end
+
+  desc "Custom pipeline for quick tests"
+  lane :custom do
+    build_ipa
+    upload  
+  end
+
+  after_all do |lane|
+    # This block is called, only if the executed lane was successful
+    say "I finished what you asked for. Did I do good?"
+  end
+
+  error do |lane, exception| 
+    say "Error when running fastlane"
+  end
+end
+
+platform :android do
+  desc "Runs all the tests"
+  lane :test do
+    getEnv('dev')
+    gradle(task: "clean build test", project_dir: ANDROID_PROJECT_PATH)
+  end
+
+  desc "Create apk with debug key store in development mode"
+  lane :dev do
+    buildType = 'Debug'
+    getEnv('dev')
+    makeApk(buildType)
+  end
+
+  desc "Make beta build and upload to beta track"
+  lane :beta do
+    buildType = 'Release'
+    getEnv('release')
+    makeAab(buildType)
+    puts "[Release] Meta data path: #{CONFIG_FOLDER_PATH}/metadata/android"
+    upload_to_play_store(track: 'beta', skip_upload_apk: true, 'metadata_path': "#{CONFIG_FOLDER_PATH}/metadata/android")
+  end
+
+  lane :draft do
+    buildType = 'Release'
+    getEnv('release')
+    makeAab(buildType)
+    puts "[Draft] Meta data path: #{CONFIG_FOLDER_PATH}/metadata/android"
+    upload_to_play_store(track: 'beta', release_status: 'draft', skip_upload_apk: true, 'metadata_path': "#{CONFIG_FOLDER_PATH}/metadata/android")
+  end
+end
+
+# Common methods
+def makeApk(buildType)
+  makeAndroidBuild(buildType, 'assemble')
+  copyBuiltApp(lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH], buildType)
+end
+
+def makeAab(buildType)
+  makeAndroidBuild(buildType, 'bundle')
+  copyBuiltApp(lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH], buildType)
+end
+
+def makeAndroidBuild(buildType, task)
+  UI.header("[Android] Build Type : " + buildType + " task : " + task)
+  sh("gradle --project-dir '#{ANDROID_PROJECT_PATH}' wrapper")
+  # build the release variant  
+  build_android_app(
+    task: 'clean',
+    project_dir: ANDROID_PROJECT_PATH
+  )
+  increment_version_code(
+        version_code: get_next_version_code(),
+        gradle_file_path: GRADLE_FILE_PATH
+    )
+  build_android_app(
+    task: task,
+    build_type: buildType,
+    print_command: true,
+    properties: getAndroidBuildProperties(buildType),
+    project_dir: ANDROID_PROJECT_PATH,
+    print_command_output: true
+  )
+
+  UI.success("Finished making android build for " + buildType + " task : " + task)
+end
+
+def getAndroidBuildProperties(buildType)
+  properties = {}
+
+  if buildType == 'Debug'
+    properties['android.injected.signing.store.file'] = File.expand_path(ENV["ANDROID_SIGNING_STORE_FILE_PATH"])
+  else
+    properties['android.injected.signing.store.file'] = File.join(ROOT_FOLDER_PATH, ENV["ANDROID_SIGNING_STORE_FILE_PATH"])
+  end
+
+  properties['android.injected.signing.store.password'] = ENV["ANDROID_SIGNING_STORE_FILE_PASSWORD"]
+  properties['android.injected.signing.key.alias'] = ENV["ANDROID_SIGNING_KEY_ALIAS"]
+  properties['android.injected.signing.key.password'] = ENV["ANDROID_SIGNING_KEY_PASSWORD"]
+
+  puts "Properties :  #{properties}" 
+  return properties
+end
+
+#fastlane run validate_play_store_json_key json_key:./google-play-services-account.json
+
+def get_next_version_code()
+  puts "fetching play_store_version_code_to_upload_to"
+  #versions = google_play_track_version_codes(track: 'alpha')
+  #puts "Versions #{versions}"
+  versionCode = ['internal', 'alpha', 'beta', 'production'].map { |branch|
+      begin
+          versionCode = google_play_track_version_codes(track: branch, 
+                        package_name: ENV["ANDROID_PACKAGE_NAME"],
+                        json_key: JSON_KEY_FILE_PATH).max
+          puts "versionCode each : #{versionCode}"
+          versionCode ||= 1
+      rescue
+          1
+      end
+  }
+  puts "versionCode : #{versionCode}"
+  return versionCode.max + 1
+end
+
+
+def copyBuiltApp(source, buildType)
+  copyFile(source, ROOT_FOLDER_PATH + '/apps/' + buildType.downcase + '/v' + ENV["PRODUCT_VERSION"])
+end
+
+def copyFile(source, destination)
+  unless source.nil? || source.empty?
+    sh("mkdir -p '#{destination}'", log: false)
+    sh("cp '#{source}' '#{destination}'", log: false)
+  end
+end
