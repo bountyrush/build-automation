@@ -137,7 +137,10 @@ for target in "${targets[@]}"
 do
     target=$(echo "$target" | tr "[:upper:]" "[:lower:]")
     echo "Running fastlane for $productEnv environment : $target"
-    if [ $productEnv = 'dev' ] 
+    if [ $productEnv = 'create' ]
+    then
+        bundle exec fastlane $target 'create' --verbose
+    elif [ $productEnv = 'dev' ] 
     then
         bundle exec fastlane $target 'dev' --verbose
     elif [ $productEnv = 'release' ] 

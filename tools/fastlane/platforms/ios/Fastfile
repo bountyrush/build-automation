@@ -9,14 +9,6 @@ begin
       $BundleIdentifier = ENV["IOS_BUNDLE_IDENTIFIER"] || ENV["BUNDLE_IDENTIFIER"]
       $XcodeProjectPath = File.join($PlatformProjectBuildPath, ENV["IOS_TARGET_SCHEME"] + ".xcodeproj").freeze
       $OutputName       = ENV["PRODUCT_NAME"] + ".ipa";
-      
-      # Set version number first
-      increment_version_number(
-        xcodeproj: $XcodeProjectPath,
-        version_number: ENV["PRODUCT_VERSION"] # Set a specific version number
-      )
-      # Increment build number
-      increment_build_number(xcodeproj: $XcodeProjectPath)
     end
 
     desc "Build xcode project"
@@ -34,7 +26,6 @@ begin
 
     desc "Upload ipa file to AppStoreConnect and check if AppStore site is configures correctly"
     lane :upload do
-    
       pilot(
         ipa: $OutputDirectory + "/" + $OutputName, 
         skip_submission:true
@@ -53,14 +44,24 @@ begin
       match(type: type, app_identifier: ENV["BUNDLE_IDENTIFIER"], git_url: ENV["IOS_CERTIFICATES_GIT_URL"])
     end
 
+    desc "Create app"
+    lane :create do
+      produce(
+        username: ENV["IOS_APP_STORE_USER_NAME"],
+        app_name: ENV["PRODUCT_TITLE"]
+      )
+    end
+
     desc "Build for dev"
     lane :dev do
+      bumpVersion()
       match_profile(type: 'development')
       build(configuration: 'Debug', export_method: 'development')
     end
 
     desc "Build for release"
     lane :release do
+      bumpVersion()
       match_profile(type: 'appstore')
       increment_build_number(xcodeproj: $XcodeProjectPath)
       build(configuration: 'Release', export_method: 'app-store')
@@ -74,5 +75,15 @@ begin
     error do |lane, exception| 
       say "Error when running fastlane"
     end
+  end
+
+  def bumpVersion()
+    # Set version number first
+    increment_version_number(
+      xcodeproj: $XcodeProjectPath,
+      version_number: ENV["PRODUCT_VERSION"] # Set a specific version number
+    )
+    # Increment build number
+    increment_build_number(xcodeproj: $XcodeProjectPath)
   end
 end
