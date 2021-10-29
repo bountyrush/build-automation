@@ -14,7 +14,7 @@ rootDir=$PWD
  
 #rsync -ax --exclude [relative path to directory to exclude] /path/from /path/to
 rm -rf ./.git
-rsync -ax --exclude 'config' . $rootDir
+rsync -ax --exclude 'config' . $rootDir --verbose
 
+cd $rootDir
 rm -rf ./cache
-
