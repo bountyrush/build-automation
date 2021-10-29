@@ -1,4 +1,11 @@
 cd "$(dirname "$0")"
+if [ -d .git ]; then
+  echo "This is a git repository folder. So not updating! Try in a non-git repository folder to update the files"
+  exit 0
+else
+  echo "Trying to update by fetching from build-automation git repository..."
+fi;
+
 rootDir=$PWD
  mkdir cache
  cd cache
