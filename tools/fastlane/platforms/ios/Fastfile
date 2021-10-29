@@ -110,7 +110,7 @@ begin
         item.build_settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'iPhone Distribution'
         item.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = "match AppStore #{$BundleIdentifier}"
       end
-      if(item.build_settings['CURRENT_PROJECT_VERSION'] == '') #If empty set it. Else don't
+      if(!item.build_settings.key?('CURRENT_PROJECT_VERSION')) #If empty set it. Else don't
         item.build_settings['CURRENT_PROJECT_VERSION'] = 1
       end
     end
