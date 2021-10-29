@@ -23,12 +23,20 @@ loadTargets () {
 }
 
 loadVersions () {
-    while IFS= read -r line
-    do
-        if ! [ -z "$line" ]; then
-            versions+=("$line")
-        fi
-    done < "./config/Versions.txt"
+    FILE="./config/Versions.txt"
+    if test -f "$FILE"; then
+            while IFS= read -r line
+        do
+            if ! [ -z "$line" ]; then
+                versions+=("$line")
+            fi
+        done < "./config/Versions.txt"
+    else
+        version=$(grep m_EditorVersion temp/ProjectSettings/ProjectVersion.txt | cut -d':' -f2 | xargs)
+        versions=($version)
+    fi
+
+    
     echo "Versions to build : $versions"
 }
 
@@ -48,7 +56,7 @@ makeUnityBuild () {
     if [ ${#versions[@]} -eq 0 ]; then
         versions=()
         echo "Set unity version to use in Versions.txt file"
-        printf "%s\n" "${versions[@]}" > Versions.txt
+        printf "%s\n" "${versions[@]}" > config/Versions.txt
         exit 0
     else
         echo "Using versions set in Versions.txt file..."
@@ -57,7 +65,7 @@ makeUnityBuild () {
     if [ ${#targets[@]} -eq 0 ]; then
         targets=()
         echo "Set platforms in Targets.txt file"
-        printf "%s\n" "${targets[@]}" > Targets.txt
+        printf "%s\n" "${targets[@]}" > config/Targets.txt
         exit 0
     else
         echo "Using targets set in Targets.txt file..."
