@@ -41,7 +41,11 @@ begin
     lane :match_profile do |values|
       type  = values[:type]
       puts "Matching profiles for for #{type}"
-      match(type: type, app_identifier: ENV["BUNDLE_IDENTIFIER"], git_url: ENV["IOS_CERTIFICATES_GIT_URL"])
+      match(type: type, app_identifier: $BundleIdentifier, git_url: ENV["IOS_CERTIFICATES_GIT_URL"], force: true)
+
+      mapping = Actions.lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]
+      puts "mapping #{mapping}"
+      update_code_signing_settings(use_automatic_signing: false, path: $XcodeProjectPath, profile_name: mapping[ENV['MATCH_APP_IDENTIFIER']])
     end
 
     desc "Create app"
@@ -54,16 +58,15 @@ begin
 
     desc "Build for dev"
     lane :dev do
-      bumpVersion()
+      setupXcodeProject()
       match_profile(type: 'development')
       build(configuration: 'Debug', export_method: 'development')
     end
 
     desc "Build for release"
     lane :release do
-      bumpVersion()
+      setupXcodeProject()
       match_profile(type: 'appstore')
-      increment_build_number(xcodeproj: $XcodeProjectPath)
       build(configuration: 'Release', export_method: 'app-store')
       upload
     end
@@ -85,5 +88,32 @@ begin
     )
     # Increment build number
     increment_build_number(xcodeproj: $XcodeProjectPath)
+  end
+
+  def setupXcodeProject()
+    setXcodeBuildSettings()
+    bumpVersion()
+  end
+
+  def setXcodeBuildSettings()
+    fastlane_require 'xcodeproj'
+    project = Xcodeproj::Project.open($XcodeProjectPath)
+    target = project.native_targets.detect { |target| target.name == ENV["IOS_TARGET_SCHEME"] }
+    target.build_configurations.each do |item|
+      item.build_settings['VERSIONING_SYSTEM'] = "apple-generic"
+      if item.name == 'Debug'
+        item.build_settings['CODE_SIGN_IDENTITY'] = 'iPhone Developer'
+        item.build_settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'iPhone Developer'
+        item.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = "match Development #{$BundleIdentifier}"
+      else
+        item.build_settings['CODE_SIGN_IDENTITY'] = 'iPhone Distribution'
+        item.build_settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'iPhone Distribution'
+        item.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = "match AppStore #{$BundleIdentifier}"
+      end
+      if(item.build_settings['CURRENT_PROJECT_VERSION'] == '') #If empty set it. Else don't
+        item.build_settings['CURRENT_PROJECT_VERSION'] = 1
+      end
+    end
+    project.save
   end
 end
