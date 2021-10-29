@@ -13,6 +13,7 @@ rootDir=$PWD
  cd build-automation
  
 #rsync -ax --exclude [relative path to directory to exclude] /path/from /path/to
+rm -rf ./.git
 rsync -ax --exclude ../../config . $rootDir
 
 cd $rootDir
