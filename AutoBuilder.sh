@@ -32,7 +32,7 @@ loadVersions () {
             fi
         done < "./config/Versions.txt"
     else
-        version=$(grep m_EditorVersion temp/ProjectSettings/ProjectVersion.txt | cut -d':' -f2 | xargs)
+        version=$(grep m_EditorVersion temp/ProjectSettings/ProjectVersion.txt | cut -d':' -f2 | head -n 1 | xargs)
         versions=($version)
     fi
 
