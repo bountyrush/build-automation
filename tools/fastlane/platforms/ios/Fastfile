@@ -45,12 +45,21 @@ begin
       pilot(
         ipa: $OutputDirectory + "/" + $OutputName, 
         skip_submission:true
-      )
-      
+      );
+      submit_metadata();
       say "A new build is ready to deploy on testflight!"
       
       #https://docs.fastlane.tools/actions/deliver/ for updating meta data automatically
       
+    end
+
+    desc "Upload Metadata to App Store"
+    lane :submit_metadata do
+      deliver(
+        submit_for_review: false,
+        force: true,
+        metadata_path: "#{CONFIG_FOLDER_PATH}/metadata/ios"
+      )
     end
 
     desc "For matching certificates"
