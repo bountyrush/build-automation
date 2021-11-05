@@ -52,7 +52,7 @@ begin
     lane :create do
       produce(
         username: ENV["IOS_APP_STORE_USER_NAME"],
-        app_name: ENV["PRODUCT_TITLE"]
+        #app_name: ENV["PRODUCT_TITLE"]
       )
     end
 
