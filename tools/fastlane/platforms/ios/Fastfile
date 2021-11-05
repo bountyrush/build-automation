@@ -47,7 +47,7 @@ begin
         #skip_submission:true
         distribute_external: true,
         groups: ["External"],
-        changelog: 'Newest changes and bug fixes')
+        changelog: 'Newest changes and bug fixes'
       );
       
       submit_metadata();
