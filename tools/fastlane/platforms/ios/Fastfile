@@ -44,8 +44,12 @@ begin
     lane :upload do
       pilot(
         ipa: $OutputDirectory + "/" + $OutputName, 
-        skip_submission:true
+        #skip_submission:true
+        distribute_external: true,
+        groups: ["External"],
+        changelog: 'Newest changes and bug fixes')
       );
+      
       submit_metadata();
       say "A new build is ready to deploy on testflight!"
       
