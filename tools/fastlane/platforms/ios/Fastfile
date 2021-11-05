@@ -8,20 +8,36 @@ begin
     before_all do
       $BundleIdentifier = ENV["IOS_BUNDLE_IDENTIFIER"] || ENV["BUNDLE_IDENTIFIER"]
       $XcodeProjectPath = File.join($PlatformProjectBuildPath, ENV["IOS_TARGET_SCHEME"] + ".xcodeproj").freeze
+      $XcodeWorkspaceProjectPath = File.join($PlatformProjectBuildPath, ENV["IOS_TARGET_SCHEME"] + ".xcworkspace").freeze
       $OutputName       = ENV["PRODUCT_NAME"] + ".ipa";
+
+      if(!File.exist?($XcodeWorkspaceProjectPath)) 
+        $XcodeWorkspaceProjectPath = '';
+      end
+
     end
 
     desc "Build xcode project"
     lane :build do |values|
       configuration = values[:configuration]
       export_method = values[:export_method]
-      gym(
-        project: $XcodeProjectPath,
-        output_directory: $OutputDirectory,
-        output_name: $OutputName,
-        configuration: configuration,
-        export_method: export_method
-      )
+      if($XcodeWorkspaceProjectPath == '')
+        gym(
+          project: ($XcodeWorkspaceProjectPath == '') ? $XcodeProjectPath : $XcodeWorkspaceProjectPath,
+          output_directory: $OutputDirectory,
+          output_name: $OutputName,
+          configuration: configuration,
+          export_method: export_method
+        )
+      else
+        gym(
+          workspace: $XcodeWorkspaceProjectPath,
+          output_directory: $OutputDirectory,
+          output_name: $OutputName,
+          configuration: configuration,
+          export_method: export_method
+        )
+      end
     end
 
     desc "Upload ipa file to AppStoreConnect and check if AppStore site is configures correctly"
