@@ -23,7 +23,7 @@ begin
         task = values[:task]
         build_type = values[:build_type]
         puts "Task #{task}"
-
+        sh("gradle --project-dir '#{$PlatformProjectBuildPath}' wrapper")
         gradle(
             task: task,
             build_type: build_type,
@@ -52,7 +52,7 @@ begin
       desc "Build for release"
       lane :release do
         build(task: 'bundle', build_type: 'Release')
-        #upload(track: 'beta')
+        upload(track: 'beta')
       end
 
       desc "Upload a draft (useful for very first time setup)"
