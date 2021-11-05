@@ -117,13 +117,6 @@ fi
 
 
 # Run Fastlane to build the project
-echo "Copy metadata of the app to fastlane metadata"
-#Copy for Android
-androidMetaDataFolder="$runningDirectory/config/metadata/android/en-US/"
-echo "$PRODUCT_TITLE" > "$androidMetaDataFolder/title.txt"
-echo "$PRODUCT_SHORT_DESCRIPTION" > "$androidMetaDataFolder/short_description.txt"
-echo "$PRODUCT_FULL_DESCRIPTION" > "$androidMetaDataFolder/full_description.txt"
-
 echo "Running Fastlane...."
 #Load environment variables
 set -o allexport
