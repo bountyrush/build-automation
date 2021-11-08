@@ -27,7 +27,8 @@ begin
           output_directory: $OutputDirectory,
           output_name: $OutputName,
           configuration: configuration,
-          export_method: export_method
+          export_method: export_method,
+          skip_archive: true
         )
       else
         gym(
