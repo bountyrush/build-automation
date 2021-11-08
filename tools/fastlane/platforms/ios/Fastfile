@@ -127,6 +127,10 @@ begin
   def setXcodeBuildSettings()
     fastlane_require 'xcodeproj'
     project = Xcodeproj::Project.open($XcodeProjectPath)
+
+    # Setting App Uses Non-Exempt Encryption to false. This means using no excryption or using exempted encryption (https)
+    set_info_plist_value(path: $PlatformProjectBuildPath + "/Info.plist", key: "ITSAppUsesNonExemptEncryption", value: false)
+
     target = project.native_targets.detect { |target| target.name == ENV["IOS_TARGET_SCHEME"] }
     target.build_configurations.each do |item|
       item.build_settings['VERSIONING_SYSTEM'] = "apple-generic"
@@ -139,6 +143,7 @@ begin
         item.build_settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'iPhone Distribution'
         item.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = "match AppStore #{$BundleIdentifier}"
       end
+      
       if(!item.build_settings.key?('CURRENT_PROJECT_VERSION')) #If empty set it. Else don't
         item.build_settings['CURRENT_PROJECT_VERSION'] = 1
       end
