@@ -1,25 +1,14 @@
 UNITY_HUB=/Applications/Unity/Hub/Editor
 versions=()
-targets=()
-productEnv=$1
-skipMakingUnityBuild=$2
-
-echo "Tip: You can set platform targets to build in Targets.txt file with iOS, Android, WebGL, tvOS, Win, OSXUniversal, Linux64"
+target=$1
+productEnv=$2
+skipMakingUnityBuild=$3
+echo "Usage: ./AutoBuilder.sh PLATFORM_NAME(iOS/Android) ENVIRONMENT(dev/release/draft) SKIP_UNITY_EXPORT(1)"
 
 loadEnv () {
   set -a
   [ -f ./config/env/.env ] && . ./config/env/.env
   set +a
-}
-
-loadTargets () {
-    while IFS= read -r line
-    do
-        if ! [ -z "$line" ]; then
-            targets+=("$line")
-        fi
-    done < "./config/Targets.txt"
-    echo "Targets to build : ${targets[@]}"
 }
 
 loadVersions () {
@@ -62,37 +51,26 @@ makeUnityBuild () {
         echo "Using versions set in Versions.txt file..."
     fi
 
-    if [ ${#targets[@]} -eq 0 ]; then
-        targets=()
-        echo "Set platforms in Targets.txt file"
-        printf "%s\n" "${targets[@]}" > config/Targets.txt
-        exit 0
-    else
-        echo "Using targets set in Targets.txt file..."
-    fi
 
     printf "%s\n" "${versions[@]}"
-    printf "%s\n" "${targets[@]}"
+    printf "%s\n" "${target}"
 
     for version in "${versions[@]}"
     do 
-        for target in "${targets[@]}"
-        do
-            echo "Building for target : $target ($version)"
-            UNITY_APP="$UNITY_HUB/$version/Unity.app/Contents/MacOS/Unity"
-            #mkdir -p "$runningDirectory/Builds/$target"
-            echo "Running project available at $(pwd)/temp"
-            $UNITY_APP \
-            -gvh_disable \
-            -batchmode \
-            -quit \
-            -nographics \
-            -buildTarget $target \
-            -silent-crashes \
-            -logfile /dev/stdout \
-            -projectPath "$(pwd)/temp" \
-            -executeMethod VoxelBusters.CoreLibrary.Editor.NativePlugins.Build.TargetBuilder.Build
-        done
+        echo "Building for target : $target ($version)"
+        UNITY_APP="$UNITY_HUB/$version/Unity.app/Contents/MacOS/Unity"
+        #mkdir -p "$runningDirectory/Builds/$target"
+        echo "Running project available at $(pwd)/temp"
+        $UNITY_APP \
+        -gvh_disable \
+        -batchmode \
+        -quit \
+        -nographics \
+        -buildTarget $target \
+        -silent-crashes \
+        -logfile /dev/stdout \
+        -projectPath "$(pwd)/temp" \
+        -executeMethod VoxelBusters.CoreLibrary.Editor.NativePlugins.Build.TargetBuilder.Build
     done
     #"$(pwd)/$each/log.txt" \
     #https://fargesportfolio.com/unity-generic-auto-build/
@@ -106,7 +84,6 @@ makeUnityBuild () {
 }
 
 loadEnv
-loadTargets
 loadVersions
 
 runningDirectory=$(pwd)
@@ -126,24 +103,23 @@ set +o allexport
 cd "$runningDirectory/tools"
 # iOS project in builds/ios and Android project in builds/android folders
 
-for target in "${targets[@]}"
-do
-    target=$(echo "$target" | tr "[:upper:]" "[:lower:]")
-    echo "Running fastlane for $productEnv environment : $target"
-    if [ $productEnv = 'create' ]
-    then
-        bundle exec fastlane $target 'create' --verbose
-    elif [ $productEnv = 'dev' ] 
-    then
-        bundle exec fastlane $target 'dev' --verbose
-    elif [ $productEnv = 'release' ] 
-    then
-        bundle exec fastlane $target 'release' --verbose
-    elif [ $productEnv = 'draft' ] 
-    then
-        bundle exec fastlane $target 'draft' --verbose
-    else
-        bundle exec fastlane $target 'dev' --verbose
-    fi
-done
+
+targetTemp=$(echo "$target" | tr "[:upper:]" "[:lower:]")
+echo "Running fastlane for $productEnv environment : $targetTemp"
+if [ $productEnv = 'create' ]
+then
+    bundle exec fastlane $targetTemp 'create' --verbose
+elif [ $productEnv = 'dev' ] 
+then
+    bundle exec fastlane $targetTemp 'dev' --verbose
+elif [ $productEnv = 'release' ] 
+then
+    bundle exec fastlane $targetTemp 'release' --verbose
+elif [ $productEnv = 'draft' ] 
+then
+    bundle exec fastlane $targetTemp 'draft' --verbose
+else
+    bundle exec fastlane $targetTemp 'dev' --verbose
+fi
+
 cd "$runningDirectory"
